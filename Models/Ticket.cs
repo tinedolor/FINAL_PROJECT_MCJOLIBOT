@@ -1,7 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations.Schema;
-
-namespace Helpdesk.Api.Models { 
-
+﻿
 public class Ticket
 {
     public int Id { get; set; }
