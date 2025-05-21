@@ -20,8 +20,8 @@ namespace Helpdesk.Api.Repositories
         {
             return _context.Remarks
                 .Where(r => r.TicketId == ticketId)
-                .Include(r => r.User)  // Include related user data
-                .OrderBy(r => r.CreatedAt)  // Or OrderByDescending
+                .Include(r => r.User) 
+                .OrderBy(r => r.CreatedAt) 
                 .AsNoTracking()
                 .ToList();
         }

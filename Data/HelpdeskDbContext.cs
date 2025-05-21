@@ -135,6 +135,28 @@ public class HelpdeskDbContext : DbContext
                 Role = "Admin",
                 EmployeeId = "EMP001",
                 DepartmentId = 1
+            },
+            new User
+            {
+                Id = 2,
+                Username = "supervisor1",
+                PasswordHash = "$2a$11$KxfOoVRHJUuYpB3YZQQh3.qpqg7xQCZQhJXBY1aB.0qHqQFTH8wOi", // Password: "admin21"
+                FullName = "John Supervisor",
+                Email = "supervisor1@helpdesk.com",
+                Role = "Supervisor",
+                EmployeeId = "EMP002",
+                DepartmentId = 1
+            },
+            new User
+            {
+                Id = 3,
+                Username = "junior1",
+                PasswordHash = "$2a$11$KxfOoVRHJUuYpB3YZQQh3.qpqg7xQCZQhJXBY1aB.0qHqQFTH8wOi", // Password: "admin21"
+                FullName = "Jane JuniorOfficer",
+                Email = "junior1@helpdesk.com",
+                Role = "JuniorOfficer",
+                EmployeeId = "EMP003",
+                DepartmentId = 1
             }
         );
     }
