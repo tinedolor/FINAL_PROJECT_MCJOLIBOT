@@ -1,25 +1,70 @@
+using System.Reflection;
+using System.Text;
+using Helpdesk.Api.Data;
+using Helpdesk.Api.Interfaces;
+using Helpdesk.Api.Models;
+using Helpdesk.Api.Repositories;
+using Helpdesk.Api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+    });
+
+// Add CORS
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend", policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
+
+// Configure HTTPS
+builder.Services.AddHttpsRedirection(options =>
+{
+    options.HttpsPort = 5001;
+});
+
+// Configure Swagger/OpenAPI
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "Helpdesk API", Version = "v1" });
+    c.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "Helpdesk API",
+        Version = "v1",
+        Description = "API for managing helpdesk tickets and user authentication",
+        Contact = new OpenApiContact
+        {
+            Name = "Support Team",
+            Email = "support@helpdesk.com"
+        },
+        License = new OpenApiLicense
+        {
+            Name = "MIT License"
+        }
+    });
 
-    // Add JWT Authentication to Swagger
+    // Add JWT Authentication support in Swagger
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
-        Description = "JWT Authorization header using the Bearer scheme",
+        Description = "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\"",
         Name = "Authorization",
         In = ParameterLocation.Header,
         Type = SecuritySchemeType.ApiKey,
-        Scheme = "Bearer"
+        Scheme = "Bearer",
+        BearerFormat = "JWT"
     });
 
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
@@ -33,15 +78,21 @@ builder.Services.AddSwaggerGen(c =>
                     Id = "Bearer"
                 }
             },
-            Array.Empty<string>()
+            new string[] {}
         }
     });
+
+    // Include XML comments for better documentation
+    var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    c.IncludeXmlComments(xmlPath);
+
+    // Enable annotations for better documentation
+    c.EnableAnnotations();
 });
 
-// Configure JWT
-builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
-
-// Add authentication
+// Configure JWT Authentication
+var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -51,34 +102,45 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            ValidIssuer = builder.Configuration["Jwt:Issuer"],
-            ValidAudience = builder.Configuration["Jwt:Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
+            ValidIssuer = jwtSettings.Issuer,
+            ValidAudience = jwtSettings.Audience,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Key))
         };
     });
 
-// Add repositories (with fallback to in-memory if database fails)
-try
-{
-    builder.Services.AddDbContext<HelpdeskDbContext>(options =>
-        options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+// Configure database context
+builder.Services.AddDbContext<HelpdeskDbContext>(options =>
+    options.UseSqlServer(
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        sqlOptions =>
+        {
+            sqlOptions.EnableRetryOnFailure(
+                maxRetryCount: 5,
+                maxRetryDelay: TimeSpan.FromSeconds(30),
+                errorNumbersToAdd: null);
+        }));
 
-    builder.Services.AddScoped<ITicketRepository, DbTicketRepository>();
-    builder.Services.AddScoped<IUserRepository, DbUserRepository>();
+// Register repositories based on configuration
+var useInMemoryRepositories = builder.Configuration.GetValue<bool>("UseInMemoryRepositories", true);
+
+if (useInMemoryRepositories)
+{
+    builder.Services.AddScoped<IUserRepository, InMemoryUserRepository>();
+    builder.Services.AddScoped<IRemarkRepository, InMemoryRemarkRepository>();
+}
+else
+{
+    builder.Services.AddScoped<IUserRepository, DatabaseUserRepository>();
     builder.Services.AddScoped<IRemarkRepository, DbRemarkRepository>();
 }
-catch (Exception ex)
-{
-    Console.WriteLine($"Database connection failed, falling back to in-memory repositories: {ex.Message}");
 
-    builder.Services.AddSingleton<ITicketRepository, InMemoryTicketRepository>();
-    builder.Services.AddSingleton<IUserRepository, InMemoryUserRepository>();
-    builder.Services.AddSingleton<IRemarkRepository, InMemoryRemarkRepository>();
-}
+// Always use database for tickets
+builder.Services.AddScoped<ITicketRepository, DbTicketRepository>();
 
-// Add services
+// Register services
 builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<AuditService>();
+builder.Services.AddHttpContextAccessor();
 
 var app = builder.Build();
 
@@ -86,10 +148,26 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Helpdesk API v1");
+        c.RoutePrefix = string.Empty; // Set Swagger UI as the root page
+        c.DocumentTitle = "Helpdesk API Documentation";
+        c.DefaultModelsExpandDepth(-1); // Hide schemas by default
+        c.DisplayRequestDuration();
+        c.EnableDeepLinking();
+    });
 }
 
-app.UseHttpsRedirection();
+// Move CORS before HTTPS redirection
+app.UseCors("AllowFrontend");
+
+// Only use HTTPS redirection in production
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

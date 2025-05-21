@@ -1,18 +1,36 @@
+using Helpdesk.Api.Models;
+using Helpdesk.Api.Data;
+using Helpdesk.Api.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using System.Collections.Generic;
+using System.Linq;
 
-public class InMemoryRemarkRepository : IRemarkRepository
+namespace Helpdesk.Api.Repositories
 {
-    private readonly List<Remark> _remarks = new();
-    private int _nextId = 1;
-
-    public IEnumerable<Remark> GetByTicket(int ticketId) =>
-        _remarks.Where(r => r.TicketId == ticketId).OrderBy(r => r.CreatedAt);
-
-    public void Add(Remark remark)
+    public class InMemoryRemarkRepository : IRemarkRepository
     {
-        remark.Id = _nextId++;
-        remark.CreatedAt = DateTime.UtcNow;
-        _remarks.Add(remark);
+        private readonly HelpdeskDbContext _context;
+
+        public InMemoryRemarkRepository(HelpdeskDbContext context)
+        {
+            _context = context;
+        }
+
+        public IEnumerable<Remark> GetByTicket(int ticketId)
+        {
+            return _context.Remarks
+                .Where(r => r.TicketId == ticketId)
+                .Include(r => r.User)  // Include related user data
+                .OrderBy(r => r.CreatedAt)  // Or OrderByDescending
+                .AsNoTracking()
+                .ToList();
+        }
+
+        public void Add(Remark remark)
+        {
+            remark.CreatedAt = DateTime.UtcNow;
+            _context.Remarks.Add(remark);
+            _context.SaveChanges();
+        }
     }
 }
-4.

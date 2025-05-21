@@ -1,31 +1,35 @@
-using System.ComponentModel.DataAnnotations;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Helpdesk.Api.Models
 {
-public class User
-{
-    public int Id { get; set; }
+    public class User
+    {
+        public int Id { get; set; }
+        public string Username { get; set; }
+        public string PasswordHash { get; set; }
+        public string Role { get; set; }
+        public int DepartmentId { get; set; }
+        public string FullName { get; set; }
+        public string Email { get; set; }
+        public string EmployeeId { get; set; }
 
-        [Required]
-    public string Username { get; set; }
+        // Navigation properties
+        public virtual Department Department { get; set; }
+        
+        [InverseProperty("CreatedByUser")]
+        public virtual ICollection<Ticket> CreatedTickets { get; set; }
+        
+        [InverseProperty("AssignedToUser")]
+        public virtual ICollection<Ticket> AssignedTickets { get; set; }
+        
+        public virtual ICollection<Remark> Remarks { get; set; }
 
-        [Required]
-    public string PasswordHash { get; set; }
-
-        [Required]
-    public string Role { get; set; } // "Admin", "Supervisor", "Officer", "JuniorOfficer"
-
-        [Required]
-    public int DepartmentId { get; set; }
-
-        [Required]
-    public string FullName { get; set; }
-
-        [Required]
-    public string Email { get; set; }
-
-        [ForeignKey("DepartmentId")]
-        public Department Department { get; set; }
+        public User()
+        {
+            CreatedTickets = new List<Ticket>();
+            AssignedTickets = new List<Ticket>();
+            Remarks = new List<Remark>();
+        }
     }
 }

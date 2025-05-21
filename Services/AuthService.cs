@@ -1,19 +1,40 @@
-// Services/AuthService.cs
+using Helpdesk.Api.Interfaces;
+using Helpdesk.Api.Models;
+using Microsoft.Extensions.Configuration;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+using BCrypt.Net;
+
+namespace Helpdesk.Api.Services;
 public class AuthService
 {
     private readonly IUserRepository _userRepository;
     private readonly IConfiguration _configuration;
+    private readonly AuditService _auditService;
 
-    public AuthService(IUserRepository userRepository, IConfiguration configuration)
+    public AuthService(
+        IUserRepository userRepository, 
+        IConfiguration configuration,
+        AuditService auditService)
     {
         _userRepository = userRepository;
         _configuration = configuration;
+        _auditService = auditService;
     }
 
-    public AuthResponse Authenticate(AuthRequest request)
+    public async Task<AuthResponse> AuthenticateAsync(AuthRequest request)
     {
         var user = _userRepository.GetByUsername(request.Username);
-        if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+        var success = user != null && BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
+
+        if (user != null)
+        {
+            await _auditService.LogLoginAsync(user.Id, success);
+        }
+
+        if (!success)
             return null;
 
         var token = GenerateJwtToken(user);

@@ -1,45 +1,72 @@
+using Helpdesk.Api.Data;
+using Helpdesk.Api.Interfaces;
+using Helpdesk.Api.Models;
 using Microsoft.EntityFrameworkCore;
 
-
-public class DbTicketRepository : ITicketRepository
+namespace Helpdesk.Api.Repositories
 {
-    private readonly HelpdeskDbContext _context;
-
-    public DbTicketRepository(HelpdeskDbContext context)
+    public class DbTicketRepository : ITicketRepository
     {
-        _context = context;
+        private readonly HelpdeskDbContext _context;
+
+        public DbTicketRepository(HelpdeskDbContext context)
+        {
+            _context = context;
+        }
+
+        public IEnumerable<Ticket> GetAll()
+        {
+            return _context.Tickets
+                .Include(t => t.Remarks)
+                    .ThenInclude(r => r.User)
+                .Include(t => t.Department)
+                .Include(t => t.CreatedByUser)
+                .Include(t => t.AssignedToUser)
+                .AsNoTracking()
+                .ToList();
+        }
+
+        public IEnumerable<Ticket> GetByDepartment(int departmentId)
+        {
+            return _context.Tickets
+                .Include(t => t.Remarks)
+                    .ThenInclude(r => r.User)
+                .Include(t => t.Department)
+                .Include(t => t.CreatedByUser)
+                .Include(t => t.AssignedToUser)
+                .Where(t => t.DepartmentId == departmentId)
+                .AsNoTracking()
+                .ToList();
+        }
+
+        public Ticket GetById(int id)
+        {
+            return _context.Tickets
+                .Include(t => t.Remarks)
+                    .ThenInclude(r => r.User)
+                .Include(t => t.Department)
+                .Include(t => t.CreatedByUser)
+                .Include(t => t.AssignedToUser)
+                .AsNoTracking()
+                .FirstOrDefault(t => t.Id == id);
+        }
+
+        public void Add(Ticket ticket)
+        {
+            _context.Tickets.Add(ticket);
+            _context.SaveChanges();
+        }
+
+        public void Update(Ticket ticket)
+        {
+            _context.Entry(ticket).State = EntityState.Modified;
+            _context.SaveChanges();
+        }
+
+        public void AddRemark(Remark remark)
+        {
+            _context.Remarks.Add(remark);
+            _context.SaveChanges();
+        }
     }
-
-    public IEnumerable<Ticket> GetAll() => _context.Tickets.ToList();
-
-    public Ticket GetById(int id) => _context.Tickets.FirstOrDefault(t => t.Id == id);
-
-    public void Add(Ticket ticket)
-    {
-        ticket.CreatedAt = DateTime.UtcNow;
-        _context.Tickets.Add(ticket);
-        _context.SaveChanges();
-    }
-
-    public void Update(Ticket ticket)
-    {
-        var existing = GetById(ticket.Id);
-        if (existing == null) return;
-
-        existing.Title = ticket.Title;
-        existing.Description = ticket.Description;
-        existing.Severity = ticket.Severity;
-        existing.Status = ticket.Status;
-        existing.AssignedTo = ticket.AssignedTo;
-        existing.DepartmentId = ticket.DepartmentId;
-        existing.UpdatedAt = DateTime.UtcNow;
-
-        _context.SaveChanges();
-    }
-
-    public IEnumerable<Ticket> GetByDepartment(int departmentId) =>
-        _context.Tickets.Where(t => t.DepartmentId == departmentId).ToList();
-
-    public IEnumerable<Ticket> GetAssignedTickets(int userId) =>
-        _context.Tickets.Where(t => t.AssignedTo == userId).ToList();
 }

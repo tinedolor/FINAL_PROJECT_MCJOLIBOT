@@ -1,38 +1,56 @@
-using Microsoft.EntityFrameworkCore;
+using Helpdesk.Api.Interfaces;
+using Helpdesk.Api.Models;
+using System.Collections.Generic;
+using System.Linq;
 
-public class InMemoryTicketRepository : ITicketRepository
+namespace Helpdesk.Api.Repositories
 {
-    private readonly List<Ticket> _tickets = new();
-    private int _nextId = 1;
-
-    public IEnumerable<Ticket> GetAll() => _tickets;
-
-    public Ticket GetById(int id) => _tickets.FirstOrDefault(t => t.Id == id);
-
-    public void Add(Ticket ticket)
+    public class InMemoryTicketRepository : ITicketRepository
     {
-        ticket.Id = _nextId++;
-        ticket.CreatedAt = DateTime.UtcNow;
-        _tickets.Add(ticket);
+        private readonly List<Ticket> _tickets = new List<Ticket>();
+        private readonly List<Remark> _remarks = new List<Remark>();
+        private int _nextTicketId = 1;
+        private int _nextRemarkId = 1;
+
+        public IEnumerable<Ticket> GetAll()
+        {
+            return _tickets;
+        }
+
+        public IEnumerable<Ticket> GetByDepartment(int departmentId)
+        {
+            return _tickets.Where(t => t.DepartmentId == departmentId);
+        }
+
+        public Ticket GetById(int id)
+        {
+            var ticket = _tickets.FirstOrDefault(t => t.Id == id);
+            if (ticket != null)
+            {
+                ticket.Remarks = _remarks.Where(r => r.TicketId == id).ToList();
+            }
+            return ticket;
+        }
+
+        public void Add(Ticket ticket)
+        {
+            ticket.Id = _nextTicketId++;
+            _tickets.Add(ticket);
+        }
+
+        public void Update(Ticket ticket)
+        {
+            var index = _tickets.FindIndex(t => t.Id == ticket.Id);
+            if (index != -1)
+            {
+                _tickets[index] = ticket;
+            }
+        }
+
+        public void AddRemark(Remark remark)
+        {
+            remark.Id = _nextRemarkId++;
+            _remarks.Add(remark);
+        }
     }
-
-    public void Update(Ticket ticket)
-    {
-        var existing = GetById(ticket.Id);
-        if (existing == null) return;
-
-        existing.Title = ticket.Title;
-        existing.Description = ticket.Description;
-        existing.Severity = ticket.Severity;
-        existing.Status = ticket.Status;
-        existing.AssignedTo = ticket.AssignedTo;
-        existing.DepartmentId = ticket.DepartmentId;
-        existing.UpdatedAt = DateTime.UtcNow;
-    }
-
-    public IEnumerable<Ticket> GetByDepartment(int departmentId) =>
-        _tickets.Where(t => t.DepartmentId == departmentId);
-
-    public IEnumerable<Ticket> GetAssignedTickets(int userId) =>
-        _tickets.Where(t => t.AssignedTo == userId);
 }
