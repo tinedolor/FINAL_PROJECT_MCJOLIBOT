@@ -15,6 +15,7 @@ import Tickets from './pages/Tickets';
 import EmployeeRecords from './pages/EmployeeRecords';
 import Users from './pages/Users';
 import AuditLogs from './pages/AuditLogs';
+import Profile from './pages/Profile';
 import { AuthProvider } from './contexts/AuthContext';
 import theme from './theme';
 import './services/axiosConfig';
@@ -71,6 +72,7 @@ function App() {
                 } />
                 <Route path="tickets/create" element={<CreateTicket />} />
                 <Route path="tickets/:id" element={<TicketDetail />} />
+                <Route path="profile" element={<Profile />} />
               </Route>
               <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>

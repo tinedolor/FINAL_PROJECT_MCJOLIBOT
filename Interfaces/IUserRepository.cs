@@ -13,4 +13,6 @@ public interface IUserRepository
     User CreateAccount(AccountCreateDto accountDto);
     bool IsEmployeeIdValid(string employeeId);
     bool IsEmployeeIdRegistered(string employeeId);
+    User UpdateProfile(int userId, UserUpdateDto updateDto);
+    bool ChangePassword(int userId, string currentPassword, string newPassword);
 }

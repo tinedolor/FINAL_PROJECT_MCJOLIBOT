@@ -173,4 +173,75 @@ public class UsersController : ControllerBase
         var employees = context.Employees.ToList();
         return Ok(employees);
     }
+
+    [HttpPut("profile")]
+    [SwaggerOperation(Summary = "Update user profile")]
+    [SwaggerResponse(200, "Profile updated successfully")]
+    [SwaggerResponse(400, "Invalid input")]
+    [SwaggerResponse(404, "User not found")]
+    public async Task<IActionResult> UpdateProfile([FromBody] UserUpdateDto updateDto)
+    {
+        try
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            var userId = int.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value);
+            var user = _userRepository.UpdateProfile(userId, updateDto);
+            
+            await _auditService.LogProfileUpdateAsync(userId);
+            
+            return Ok(new { user.Id, user.Username, user.FullName, user.Email, user.Role, user.DepartmentId });
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Failed to update profile");
+            return NotFound(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating profile");
+            return StatusCode(500, "An error occurred while updating the profile");
+        }
+    }
+
+    [HttpPut("change-password")]
+    [SwaggerOperation(Summary = "Change user password")]
+    [SwaggerResponse(200, "Password changed successfully")]
+    [SwaggerResponse(400, "Invalid input or current password is incorrect")]
+    [SwaggerResponse(404, "User not found")]
+    public async Task<IActionResult> ChangePassword([FromBody] PasswordChangeDto passwordDto)
+    {
+        try
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            var userId = int.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value);
+            var success = _userRepository.ChangePassword(userId, passwordDto.CurrentPassword, passwordDto.NewPassword);
+
+            if (!success)
+            {
+                return BadRequest("Current password is incorrect");
+            }
+
+            await _auditService.LogPasswordChangeAsync(userId);
+            
+            return Ok(new { message = "Password changed successfully" });
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Failed to change password");
+            return NotFound(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error changing password");
+            return StatusCode(500, "An error occurred while changing the password");
+        }
+    }
 } 

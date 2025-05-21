@@ -27,16 +27,16 @@ namespace Helpdesk.Api.Services
         {
             try
             {
-                var auditLog = new AuditLog
+                var log = new AuditLog
                 {
+                    UserId = userId,
                     EventType = "Login",
                     Timestamp = DateTime.UtcNow,
-                    UserId = userId,
-                    Details = success ? "Login successful" : "Login failed",
+                    Details = $"Login attempt {(success ? "successful" : "failed")}",
                     IpAddress = _httpContextAccessor.HttpContext?.Connection?.RemoteIpAddress?.ToString()
                 };
 
-                _context.AuditLogs.Add(auditLog);
+                _context.AuditLogs.Add(log);
                 await _context.SaveChangesAsync();
             }
             catch (Exception ex)
@@ -115,6 +115,36 @@ namespace Helpdesk.Api.Services
             {
                 _logger.LogError(ex, "Error logging ticket update for ticket {TicketId}", ticketId);
             }
+        }
+
+        public async Task LogProfileUpdateAsync(int userId)
+        {
+            var log = new AuditLog
+            {
+                UserId = userId,
+                EventType = "ProfileUpdate",
+                Timestamp = DateTime.UtcNow,
+                Details = "User profile updated",
+                IpAddress = _httpContextAccessor.HttpContext?.Connection?.RemoteIpAddress?.ToString()
+            };
+
+            _context.AuditLogs.Add(log);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task LogPasswordChangeAsync(int userId)
+        {
+            var log = new AuditLog
+            {
+                UserId = userId,
+                EventType = "PasswordChange",
+                Timestamp = DateTime.UtcNow,
+                Details = "User password changed",
+                IpAddress = _httpContextAccessor.HttpContext?.Connection?.RemoteIpAddress?.ToString()
+            };
+
+            _context.AuditLogs.Add(log);
+            await _context.SaveChangesAsync();
         }
     }
 } 

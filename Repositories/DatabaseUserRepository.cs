@@ -122,4 +122,37 @@ public class DatabaseUserRepository : IUserRepository
     {
         return _context.Users.Any(u => u.EmployeeId == employeeId);
     }
+
+    public User UpdateProfile(int userId, UserUpdateDto updateDto)
+    {
+        var user = _context.Users.Find(userId);
+        if (user == null)
+        {
+            throw new InvalidOperationException("User not found");
+        }
+
+        user.FullName = updateDto.FullName;
+        user.Email = updateDto.Email;
+
+        _context.SaveChanges();
+        return user;
+    }
+
+    public bool ChangePassword(int userId, string currentPassword, string newPassword)
+    {
+        var user = _context.Users.Find(userId);
+        if (user == null)
+        {
+            throw new InvalidOperationException("User not found");
+        }
+
+        if (!BCrypt.Net.BCrypt.Verify(currentPassword, user.PasswordHash))
+        {
+            return false;
+        }
+
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+        _context.SaveChanges();
+        return true;
+    }
 } 
